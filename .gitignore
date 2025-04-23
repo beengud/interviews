@@ -72,4 +72,7 @@ temp/
 # System Files
 .directory
 Thumbs.db
+
+# project-specific
 hack/secure-artifact-manager/data
+hack/secure-artifact-manager/backend/target
