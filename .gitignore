@@ -72,3 +72,4 @@ temp/
 # System Files
 .directory
 Thumbs.db
+hack/secure-artifact-manager/data

@@ -1,0 +1,27 @@
+# Build Stage
+FROM rust:1.86 as builder
+
+RUN rustup target add aarch64-unknown-linux-musl
+
+# Install musl-tools (for linking) — required for static builds
+RUN apt-get update && apt-get install -y musl-tools
+
+WORKDIR /app
+COPY backend ./
+
+# Build with musl target
+RUN cargo build --release --target aarch64-unknown-linux-musl
+
+# Runtime Stage (minimal image using busybox or scratch)
+FROM alpine:latest
+
+# Add a non-root user for safety
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
+WORKDIR /app
+COPY --from=builder /app/target/aarch64-unknown-linux-musl/release/backend /app/backend
+
+ENV RUST_LOG=info
+
+CMD ["/app/backend"]
