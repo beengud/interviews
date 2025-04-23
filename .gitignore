@@ -28,7 +28,7 @@ yarn-debug.log
 *.out
 
 # Rust
-/target/
+**/target/
 Cargo.lock
 **/*.rs.bk
 
@@ -76,3 +76,5 @@ Thumbs.db
 # project-specific
 hack/secure-artifact-manager/data
 hack/secure-artifact-manager/backend/target
+
+hack/secure-artifact-manager/tanka/vendor
