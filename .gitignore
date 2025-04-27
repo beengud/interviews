@@ -10,8 +10,7 @@ CLAUDE*
 # Node.js
 node_modules/
 npm-debug.log
-yarn-error.log
-yarn-debug.log
+yarn-error.log yarn-debug.log
 .env
 .env.local
 .env.development.local
@@ -72,3 +71,7 @@ temp/
 # System Files
 .directory
 Thumbs.db
+
+# project-specific
+hack/secure-artifact-manager/data
+!hack/secure-artifact-manager/frontend/.env
