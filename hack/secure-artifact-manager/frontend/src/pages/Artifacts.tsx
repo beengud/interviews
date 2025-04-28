@@ -19,10 +19,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 type Artifact = {
   id: string;
   original_filename: string;
-  metadata: string;
-  size: number;
-  upload_time: string;
+  size_bytes: number;
   sha256: string;
+  upload_time: string;
+  metadata: string;
 };
 
 function Artifacts() {
@@ -50,7 +50,7 @@ function Artifacts() {
   const columns: GridColDef[] = [
     { field: "original_filename", headerName: "Name", flex: 2, minWidth: 150 },
     { field: "metadata", headerName: "Status", flex: 1, minWidth: 120 },
-    { field: "size", headerName: "Size (bytes)", flex: 1, minWidth: 100 },
+    { field: "size_bytes", headerName: "Size (bytes)", flex: 1, minWidth: 100 },
     { field: "upload_time", headerName: "Uploaded At", flex: 2, minWidth: 180 },
     {
       field: "download",

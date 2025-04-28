@@ -1,13 +1,22 @@
 # Build Stage
 FROM rust:1.86 as builder
 
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
+# ENV SQLX_OFFLINE=true
+
 RUN rustup target add aarch64-unknown-linux-musl
 
 # Install musl-tools (for linking) — required for static builds
-RUN apt-get update && apt-get install -y musl-tools
+RUN apt-get update && apt-get install -y musl-tools netcat-openbsd
+
 
 WORKDIR /app
 COPY backend ./
+
+
+RUN cargo install sqlx-cli --no-default-features --features postgres
 
 # Build with musl target
 RUN cargo build --release --target aarch64-unknown-linux-musl
@@ -15,13 +24,17 @@ RUN cargo build --release --target aarch64-unknown-linux-musl
 # Runtime Stage (minimal image using busybox or scratch)
 FROM alpine:latest
 
+RUN apk --no-cache add netcat-openbsd
+
 # Add a non-root user for safety
 RUN addgroup -S app && adduser -S app -G app
 USER app
 
+
 WORKDIR /app
 COPY --from=builder /app/target/aarch64-unknown-linux-musl/release/backend /app/backend
+COPY --chmod=755 backend/wait-for-postgres.sh /app/wait-for-postgres.sh
 
 ENV RUST_LOG=info
 
-CMD ["/app/backend"]
+CMD ["/app/wait-for-postgres.sh", "/app/backend"]
