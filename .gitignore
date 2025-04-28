@@ -76,3 +76,4 @@ Thumbs.db
 hack/secure-artifact-manager/data
 hack/secure-artifact-manager/backend/target
 !hack/secure-artifact-manager/frontend/.env
+hack/secure-artifact-manager/tanka/vendor
