@@ -23,6 +23,7 @@ type Artifact = {
   sha256: string;
   upload_time: string;
   metadata: string;
+  scan_status: string;
 };
 
 function Artifacts() {
@@ -47,8 +48,80 @@ function Artifacts() {
     fetchArtifacts();
   };
 
+  const getScanStatusDisplay = (status: string) => {
+    switch (status) {
+      case "clean":
+        return (
+          <Box
+            sx={{
+              bgcolor: "#d0f0c0",
+              borderRadius: "4px",
+              px: 1,
+              py: 0.5,
+              display: "inline-flex",
+              alignItems: "center",
+              fontWeight: "bold",
+            }}
+            title="Clean"
+          >
+            ✅
+          </Box>
+        );
+      case "in-progress":
+        return (
+          <Box
+            sx={{
+              bgcolor: "#fff4cc",
+              borderRadius: "4px",
+              px: 1,
+              py: 0.5,
+              display: "inline-flex",
+              alignItems: "center",
+              fontWeight: "bold",
+              animation: "spin 2s linear infinite",
+              "@keyframes spin": {
+                "0%": { transform: "rotate(0deg)" },
+                "100%": { transform: "rotate(360deg)" },
+              },
+            }}
+            title="Scanning..."
+          >
+            🔄
+          </Box>
+        );
+      case "quarantined":
+        return (
+          <Box
+            sx={{
+              bgcolor: "#f8d7da",
+              borderRadius: "4px",
+              px: 1,
+              py: 0.5,
+              display: "inline-flex",
+              alignItems: "center",
+              fontWeight: "bold",
+            }}
+            title="Quarantined"
+          >
+            🛑
+          </Box>
+        );
+      default:
+        return <Box>{status}</Box>;
+    }
+  };
+
   const columns: GridColDef[] = [
     { field: "original_filename", headerName: "Name", flex: 2, minWidth: 150 },
+    {
+      field: "scan_status",
+      headerName: "Scan Status",
+      flex: 1,
+      minWidth: 120,
+      renderCell: (params: GridRenderCellParams<Artifact>) =>
+        getScanStatusDisplay(params.value),
+      sortable: false,
+    },
     { field: "metadata", headerName: "Status", flex: 1, minWidth: 120 },
     { field: "size_bytes", headerName: "Size (bytes)", flex: 1, minWidth: 100 },
     { field: "upload_time", headerName: "Uploaded At", flex: 2, minWidth: 180 },

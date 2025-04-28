@@ -30,6 +30,8 @@ pub struct ArtifactMetadata {
     pub upload_time: String,
 
     pub metadata: String,
+
+    pub scan_status: String,
 }
 
 #[get("/artifacts")]
@@ -37,7 +39,7 @@ pub async fn list_artifacts(db_pool: web::Data<PgPool>) -> impl Responder {
     // Query artifact metadata from PostgreSQL database
     let artifacts = sqlx::query_as::<_, ArtifactMetadata>(
         r#"
-        SELECT id, original_filename, size_bytes, sha256, upload_time, metadata
+        SELECT id, original_filename, size_bytes, sha256, upload_time, metadata, scan_status
         FROM artifacts
         ORDER BY upload_time DESC
         "#
@@ -111,13 +113,14 @@ pub async fn upload_artifact(
         sha256,
         upload_time: upload_time.clone(),
         metadata: "Uploaded via UI".to_string(),
+        scan_status: "in-progress".to_string(),
     };
 
     // Insert metadata into PostgreSQL database
     let insert_result = sqlx::query(
         r#"
-        INSERT INTO artifacts (id, original_filename, size_bytes, sha256, upload_time, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO artifacts (id, original_filename, size_bytes, sha256, upload_time, metadata, scan_status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#)
         .bind(&meta.id)
         .bind(&meta.original_filename)
@@ -125,6 +128,7 @@ pub async fn upload_artifact(
         .bind(&meta.sha256)
         .bind(&meta.upload_time)
         .bind(&meta.metadata)
+        .bind(&meta.scan_status)
     .execute(db_pool.get_ref())
     .await;
 
@@ -133,8 +137,57 @@ pub async fn upload_artifact(
         return HttpResponse::InternalServerError().body("Failed to save artifact metadata");
     }
 
+    // Trigger a mock scan immediately after upload
+    let scan_result = sqlx::query(
+        r#"
+        UPDATE artifacts
+        SET scan_status = $1
+        WHERE id = $2
+        "#)
+        .bind("clean")
+        .bind(&id)
+        .execute(db_pool.get_ref())
+        .await;
+
+    if let Err(e) = scan_result {
+        log::error!("Failed to update scan status after upload: {}", e);
+    } else {
+        log::info!("Artifact {} automatically scanned and marked as clean", id);
+    }
+
     log::info!("Uploaded file: {} (saved as: {})", original_filename, id);
     HttpResponse::Ok().body(id)
+}
+
+#[post("/scan/{id}")]
+pub async fn scan_artifact(
+    path: web::Path<String>,
+    db_pool: web::Data<PgPool>,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Mock scan: update scan_status to "clean"
+    let update_result = sqlx::query(
+        r#"
+        UPDATE artifacts
+        SET scan_status = $1
+        WHERE id = $2
+        "#)
+        .bind("clean")
+        .bind(&id)
+        .execute(db_pool.get_ref())
+        .await;
+
+    match update_result {
+        Ok(_) => {
+            log::info!("Artifact {} marked as clean after scan", id);
+            HttpResponse::Ok().body(format!("Artifact {} scanned and marked as clean", id))
+        },
+        Err(e) => {
+            log::error!("Failed to update scan status for artifact {}: {}", id, e);
+            HttpResponse::InternalServerError().body("Failed to update scan status")
+        }
+    }
 }
 
 #[get("/download/{id}")]
@@ -198,118 +251,6 @@ pub async fn download_artifact(
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(list_artifacts)
         .service(upload_artifact)
-        .service(download_artifact);
+        .service(download_artifact)
+        .service(scan_artifact);
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use actix_web::{test, App, http::StatusCode};
-//     use futures_util::stream::StreamExt as _;
-//     use std::{fs, io::Read};
-//     use std::str;
-//     use serde_json;
-
-//     #[actix_web::test]
-//     async fn test_list_artifacts_empty() {
-//         // Ensure data directory is fresh
-//         let _ = fs::remove_dir_all("./data");
-//         fs::create_dir_all("./data").unwrap();
-
-//         let app = test::init_service(
-//             App::new().service(list_artifacts)
-//         ).await;
-//         let req = test::TestRequest::get().uri("/artifacts").to_request();
-//         let resp = test::call_service(&app, req).await;
-//         assert_eq!(resp.status(), StatusCode::OK);
-
-//         let body: Vec<ArtifactMetadata> = test::read_body_json(resp).await;
-//         assert!(body.is_empty());
-//     }
-
-//     #[actix_web::test]
-//     async fn test_list_artifacts_with_meta() {
-//         let _ = fs::remove_dir_all("./data");
-//         fs::create_dir_all("./data").unwrap();
-
-//         let meta = ArtifactMetadata {
-//             id: "test-id".into(),
-//             original_filename: "file.txt".into(),
-//             size: 123,
-//             sha256: "abc".into(),
-//             upload_time: "2025-01-01T00:00:00Z".into(),
-//             metadata: "meta".into(),
-//         };
-//         fs::write("./data/test-id.json", serde_json::to_string(&meta).unwrap()).unwrap();
-
-//         let app = test::init_service(
-//             App::new().service(list_artifacts)
-//         ).await;
-//         let req = test::TestRequest::get().uri("/artifacts").to_request();
-//         let resp = test::call_service(&app, req).await;
-//         assert_eq!(resp.status(), StatusCode::OK);
-
-//         let body: Vec<ArtifactMetadata> = test::read_body_json(resp).await;
-//         assert_eq!(body.len(), 1);
-//         assert_eq!(body[0], meta);
-//     }
-
-//     #[actix_web::test]
-//     async fn test_upload_and_download_artifact() {
-//         // Reset data directory
-//         let _ = fs::remove_dir_all("./data");
-//         fs::create_dir_all("./data").unwrap();
-
-//         // Prepare multipart payload
-//         let boundary = "TESTBOUNDARY";
-//         let payload = format!(
-//             "--{boundary}\r\n\
-//              Content-Disposition: form-data; name=\"file\"; filename=\"hello.txt\"\r\n\
-//              \r\n\
-//              Hello, world!\r\n\
-//              --{boundary}--\r\n",
-//             boundary=boundary
-//         );
-//         let content_type = format!("multipart/form-data; boundary={}", boundary);
-
-//         let app = test::init_service(
-//             App::new()
-//                 .service(upload_artifact)
-//                 .service(download_artifact)
-//         ).await;
-
-//         // Upload
-//         let req = test::TestRequest::post()
-//             .uri("/upload")
-//             .insert_header(("Content-Type", content_type.clone()))
-//             .set_payload(payload.clone())
-//             .to_request();
-//         let resp = test::call_service(&app, req).await;
-//         assert_eq!(resp.status(), StatusCode::OK);
-
-//         let body_bytes = test::read_body(resp).await;
-//         let id = str::from_utf8(&body_bytes).unwrap();
-//         assert!(!id.is_empty());
-
-//         // Verify metadata file
-//         let meta_path = format!("./data/{}.json", id);
-//         let meta_contents = fs::read_to_string(&meta_path).unwrap();
-//         let meta: ArtifactMetadata = serde_json::from_str(&meta_contents).unwrap();
-//         assert_eq!(meta.id, id);
-//         assert_eq!(meta.original_filename, "hello.txt");
-//         assert_eq!(meta.size, "Hello, world!".len() as u64);
-
-//         // Download
-//         let req = test::TestRequest::get()
-//             .uri(&format!("/download/{}", id))
-//             .to_request();
-//         let mut resp = test::call_service(&app, req).await;
-//         assert_eq!(resp.status(), StatusCode::OK);
-
-//         let mut downloaded = Vec::new();
-//         while let Some(chunk) = resp.take_body().next().await {
-//             downloaded.extend_from_slice(&chunk.unwrap());
-//         }
-//         assert_eq!(downloaded, b"Hello, world!");
-//     }
-// }
