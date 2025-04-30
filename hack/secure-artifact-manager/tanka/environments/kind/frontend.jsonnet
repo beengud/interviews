@@ -1,0 +1,47 @@
+local k = import 'k.libsonnet';
+local deployment = k.core.v1.deployment;
+local service = k.core.v1.service;
+
+{
+  frontend:: [
+    {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: {
+        name: 'frontend',
+        labels: { app: 'frontend' },
+      },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: 'frontend' } },
+        template: {
+          metadata: { labels: { app: 'frontend' } },
+          spec: {
+            containers: [{
+              name: 'frontend',
+              image: 'localhost:5005/frontend:latest',
+              ports: [{ containerPort: 3000 }],
+            }],
+          },
+        },
+      },
+    },
+
+    {
+      apiVersion: 'v1',
+      kind: 'Service',
+      metadata: {
+        name: 'frontend',
+      },
+      spec: {
+        selector: {
+          app: 'frontend',
+        },
+        ports: [{
+          port: 3000,
+          targetPort: 3000,
+        }],
+      },
+    },
+  ],
+}

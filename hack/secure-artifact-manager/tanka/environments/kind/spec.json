@@ -2,10 +2,11 @@
   "apiVersion": "tanka.dev/v1alpha1",
   "kind": "Environment",
   "metadata": {
-    "name": "environments/default"
+    "name": "kind"
   },
   "spec": {
     "namespace": "default",
+    "apiServer": "https://localhost:6443", 
     "resourceDefaults": {},
     "expectVersions": {}
   }

@@ -1,0 +1,8 @@
+# local_registry = "localhost:5005"
+docker_build("localhost:5005/backend", ".", dockerfile="Dockerfile.backend")
+docker_build("localhost:5005/frontend", ".", dockerfile="Dockerfile.frontend")
+
+# k8s_yaml("./tanka/environments/kind")  # this runs `tk show environments/dev` implicitly if tk is in path
+k8s_yaml(local("tk show environments/kind --dangerous-allow-redirect", dir="tanka"))
+
+k8s_resource("frontend", port_forwards=3000)
