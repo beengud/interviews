@@ -1,6 +1,6 @@
 // backend.jsonnet
 local k = import 'k.libsonnet';
-local deployment = k.core.v1.deployment;
+local deployment = k.apps.v1.deployment;
 local service = k.core.v1.service;
 
 {
